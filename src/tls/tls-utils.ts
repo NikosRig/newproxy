@@ -252,7 +252,11 @@ export class TlsUtils {
   }
 
   public static isMappingHostName(DNSName: string, hostname: string): boolean {
-    let reg = DNSName.replace(/\./g, '\\.').replace(/\*/g, '[^.]+');
+    const value = typeof DNSName === 'string' ? DNSName : DNSName?.value;
+    if (typeof value !== 'string') {
+        return false;
+    }
+    let reg = value.replace(/\./g, '\\.').replace(/\*/g, '[^.]+');
     reg = `^${reg}$`;
     return new RegExp(reg).test(hostname);
   }
