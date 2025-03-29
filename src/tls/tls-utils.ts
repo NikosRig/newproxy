@@ -172,35 +172,42 @@ export class TlsUtils {
     caPair: CaPair,
     originCertificate: PeerCertificate,
   ): CaPair {
-    // const certificate = TlsUtils.covertNodeCertToForgeCert(originCertificate);
-
     const keys = forge.pki.rsa.generateKeyPair(2048);
     const cert = forge.pki.createCertificate();
     cert.publicKey = keys.publicKey;
-
+  
     cert.serialNumber = originCertificate.serialNumber;
     cert.validity.notBefore = new Date();
     cert.validity.notBefore.setFullYear(cert.validity.notBefore.getFullYear() - 1);
     cert.validity.notAfter = new Date();
     cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear() + 1);
-
+  
+    const supportedNames = [
+      'commonName', 'countryName', 'stateOrProvinceName',
+      'localityName', 'organizationName', 'organizationalUnitName',
+      'emailAddress',
+    ];
+  
+    const supportedShortNames = ['CN', 'C', 'ST', 'L', 'O', 'OU', 'E'];
+  
     const attrs: forge.pki.CertificateField[] = [];
-    Object.entries(originCertificate.subject).forEach(([name, value]) => {
-      attrs.push({
-        shortName: name,
-        value: value,
-      });
+    Object.entries(originCertificate.subject).forEach(([key, value]) => {
+      if (supportedNames.includes(key)) {
+        attrs.push({ name: key, value });
+      } else if (supportedShortNames.includes(key)) {
+        attrs.push({ shortName: key, value });
+      }
     });
-
+  
     cert.setSubject(attrs);
     cert.setIssuer(caPair.cert.subject.attributes);
-
-    const subjectAltNames = originCertificate.subjectaltname.split(', ').map((name) => ({
+  
+    const subjectAltNames = originCertificate.subjectaltname?.split(', ').map((name) => ({
       // 2 is DNS type
       type: 2,
       value: name.replace('DNS:', '').trim(),
-    }));
-
+    })) ?? [];
+  
     cert.setExtensions([
       {
         name: 'basicConstraints',
@@ -240,12 +247,12 @@ export class TlsUtils {
       },
     ]);
     cert.sign(caPair.key, forge.md.sha256.create());
-
+  
     return {
       key: keys.privateKey,
       cert: cert,
     };
-  }
+  }  
 
   public static isBrowserRequest(userAgent: string): boolean {
     return /mozilla/i.test(userAgent);
